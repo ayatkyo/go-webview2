@@ -5,6 +5,7 @@ package edge
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -277,20 +278,79 @@ func (e *Chromium) CreateCoreWebView2ControllerCompleted(res uintptr, controller
 }
 
 func (e *Chromium) MessageReceived(sender *ICoreWebView2, args *iCoreWebView2WebMessageReceivedEventArgs) uintptr {
-	var message *uint16
+	var _message *uint16
 	args.vtbl.TryGetWebMessageAsString.Call(
 		uintptr(unsafe.Pointer(args)),
-		uintptr(unsafe.Pointer(&message)),
+		uintptr(unsafe.Pointer(&_message)),
 	)
-	if e.MessageCallback != nil {
-		e.MessageCallback(w32.Utf16PtrToString(message))
+
+	message := w32.Utf16PtrToString(_message)
+
+	// TODO refactor hard coded condition
+	if message == "wails-file-drop" || message == "wails-file-select" {
+		e.HandleWailsFile(message, sender, args)
+	} else {
+		if e.MessageCallback != nil {
+			e.MessageCallback(message)
+		}
 	}
+
 	sender.vtbl.PostWebMessageAsString.Call(
 		uintptr(unsafe.Pointer(sender)),
-		uintptr(unsafe.Pointer(message)),
+		uintptr(unsafe.Pointer(_message)),
 	)
-	windows.CoTaskMemFree(unsafe.Pointer(message))
+	windows.CoTaskMemFree(unsafe.Pointer(_message))
 	return 0
+}
+
+func (e *Chromium) HandleWailsFile(message string, sender *ICoreWebView2, args *iCoreWebView2WebMessageReceivedEventArgs) {
+	fmt.Println("HandleWailsFile: " + message)
+
+	obj, err := args.GetAdditionalObjects()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	if obj == nil {
+		fmt.Println("no file drop or selected")
+		return
+	}
+
+	// get object count
+	_count, err := obj.GetCount()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	count := *(*uint32)(unsafe.Pointer(&_count))
+	fmt.Printf("object count: %d\n", count)
+
+	// prepare response
+	res := `{"event":"` + message + `","data":[{"path":"./this/is/dummy.files"}]}`
+
+	for i := uint32(0); i < count; i++ {
+		fmt.Printf("additional object at %d\n", i)
+		item, err := obj.GetValueAtIndex(i)
+		if err != nil {
+			fmt.Printf("error at %d:%s\n", i, err)
+			continue
+		}
+
+		fmt.Println(item)
+	}
+
+	payload, err := windows.UTF16PtrFromString(res)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	// TODO create helper method
+	sender.vtbl.PostWebMessageAsJSON.Call(
+		uintptr(unsafe.Pointer(sender)),
+		uintptr(unsafe.Pointer(payload)),
+	)
 }
 
 func (e *Chromium) SetPermission(kind CoreWebView2PermissionKind, state CoreWebView2PermissionState) {
