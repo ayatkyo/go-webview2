@@ -339,6 +339,22 @@ func (e *Chromium) HandleWailsFile(message string, sender *ICoreWebView2, args *
 		}
 
 		fmt.Println(item)
+
+		// cast item as file
+		f := *(*ICoreWebView2File)(unsafe.Pointer(&item))
+		fmt.Println("cast it as file")
+		fmt.Println(f)
+
+		// Uncomment code below will make the app crash
+		// CRASH BEGIN
+		// filepath, err := f.GetPath()
+		// if err != nil {
+		// 	fmt.Printf("error GetPath at %d:%s\n", i, err)
+		// 	continue
+		// }
+
+		// fmt.Println(filepath)
+		// CRASH END
 	}
 
 	payload, err := windows.UTF16PtrFromString(res)

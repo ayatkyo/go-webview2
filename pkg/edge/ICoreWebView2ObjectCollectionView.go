@@ -36,7 +36,8 @@ func (i *ICoreWebView2ObjectCollectionView) GetValueAtIndex(index uint32) (*_IUn
 	var value *_IUnknownVtbl
 	_, _, err = i.vtbl.GetValueAtIndex.Call(
 		uintptr(unsafe.Pointer(i)),
-		uintptr(unsafe.Pointer(&index)),
+		// if we use `uintptr(unsafe.Pointer(&index))` here, return value will be `nil`
+		uintptr(index),
 		uintptr(unsafe.Pointer(&value)),
 	)
 	if err != windows.ERROR_SUCCESS {
