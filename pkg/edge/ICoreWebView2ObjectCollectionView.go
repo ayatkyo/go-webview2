@@ -31,12 +31,11 @@ func (i *ICoreWebView2ObjectCollectionView) GetCount() (*uint32, error) {
 	return value, nil
 }
 
-func (i *ICoreWebView2ObjectCollectionView) GetValueAtIndex(index uint32) (*_IUnknownVtbl, error) {
+func (i *ICoreWebView2ObjectCollectionView) GetFileValueAtIndex(index uint32) (*ICoreWebView2File, error) {
 	var err error
-	var value *_IUnknownVtbl
+	var value *ICoreWebView2File
 	_, _, err = i.vtbl.GetValueAtIndex.Call(
 		uintptr(unsafe.Pointer(i)),
-		// if we use `uintptr(unsafe.Pointer(&index))` here, return value will be `nil`
 		uintptr(index),
 		uintptr(unsafe.Pointer(&value)),
 	)

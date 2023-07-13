@@ -4,6 +4,7 @@
 package edge
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -54,6 +55,14 @@ type Chromium struct {
 	NavigationCompletedCallback  func(sender *ICoreWebView2, args *ICoreWebView2NavigationCompletedEventArgs)
 	ProcessFailedCallback        func(sender *ICoreWebView2, args *ICoreWebView2ProcessFailedEventArgs)
 	AcceleratorKeyCallback       func(uint) bool
+}
+
+type FileDropItem struct {
+	Path string `json:"path"`
+}
+type FileDropResponse struct {
+	Event string         `json:"event"`
+	Data  []FileDropItem `json:"data"`
 }
 
 func NewChromium() *Chromium {
@@ -327,37 +336,41 @@ func (e *Chromium) HandleWailsFile(message string, sender *ICoreWebView2, args *
 	count := *(*uint32)(unsafe.Pointer(&_count))
 	fmt.Printf("object count: %d\n", count)
 
+	// TODO create json marshal
 	// prepare response
-	res := `{"event":"` + message + `","data":[{"path":"./this/is/dummy.files"}]}`
+	res := &FileDropResponse{
+		Event: message,
+		Data:  []FileDropItem{},
+	}
 
 	for i := uint32(0); i < count; i++ {
 		fmt.Printf("additional object at %d\n", i)
-		item, err := obj.GetValueAtIndex(i)
+		file, err := obj.GetFileValueAtIndex(i)
 		if err != nil {
 			fmt.Printf("error at %d:%s\n", i, err)
 			continue
 		}
 
-		fmt.Println(item)
+		filepath, err := file.GetPath()
+		if err != nil {
+			fmt.Printf("error GetPath at %d:%s\n", i, err)
+			continue
+		}
 
-		// cast item as file
-		f := *(*ICoreWebView2File)(unsafe.Pointer(&item))
-		fmt.Println("cast it as file")
-		fmt.Println(f)
-
-		// Uncomment code below will make the app crash
-		// CRASH BEGIN
-		// filepath, err := f.GetPath()
-		// if err != nil {
-		// 	fmt.Printf("error GetPath at %d:%s\n", i, err)
-		// 	continue
-		// }
-
-		// fmt.Println(filepath)
-		// CRASH END
+		res.Data = append(res.Data, FileDropItem{Path: filepath})
 	}
 
-	payload, err := windows.UTF16PtrFromString(res)
+	jsonPayload, err := json.Marshal(res)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	jsonString := string(jsonPayload)
+
+	fmt.Printf("sending response: %s", jsonString)
+
+	payload, err := windows.UTF16PtrFromString(jsonString)
 	if err != nil {
 		fmt.Println(err)
 	}
